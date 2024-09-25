@@ -14,7 +14,6 @@ recognizer = cv2.face.LBPHFaceRecognizer_create()
 faceCascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 # путь к датасету с фотографиями пользователей
 dataPath = path+r'/dataSet'
-
 # получаем картинки и подписи из датасета
 def get_images_and_labels(datapath):
      # получаем путь к картинкам

@@ -1,8 +1,5 @@
-# подключаем библиотеку машинного зрения
 import cv2
-# библиотека для вызова системных функций
 import os
-print(cv2.__version__)
 # получаем путь к этому скрипту
 path = os.path.dirname(os.path.abspath(__file__))
 # указываем, что мы будем искать лица по примитивам Хаара
@@ -19,6 +16,9 @@ video=cv2.VideoCapture(0)
 while True:
     # берём видеопоток
     ret, im =video.read()
+    # проверяем, что изображение не пустое
+    if not ret or im is None:
+        continue
     # переводим всё в ч/б для простоты
     gray=cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
     # настраиваем параметры распознавания и получаем лицо с камеры
