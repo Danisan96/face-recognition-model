@@ -31,10 +31,7 @@ while True:
         # если мы знаем id пользователя
         if(nbr_predicted==7):
              # подставляем вместо него имя человека
-             nbr_predicted='Danya Golubenko'
-        if(nbr_predicted==7):
-             # подставляем вместо него имя человека
-             nbr_predicted='Nikita Pashkov'     
+             nbr_predicted='Danya Golubenko'     
         if(nbr_predicted==2):
              # подставляем вместо него имя человека
              nbr_predicted='Tonya Ivanickaya'     
