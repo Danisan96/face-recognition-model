@@ -1,11 +1,15 @@
 import cv2
 import os
 import pysftp
+import logging
+import numpy as np
+import tempfile
+
+logging.basicConfig(filename='face_capture.log', level=logging.INFO,
+                    format='%(asctime)s:%(levelname)s:%(message)s')
 
 # Получаем путь к этому скрипту
 path = os.path.dirname(os.path.abspath(__file__))
-
-local_data_path = os.path.join(path, "dataSet")
 
 detector = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 
@@ -16,10 +20,10 @@ offset = 50
 # Запрашиваем номер пользователя
 name = input('Введите номер пользователя: ')
 
-# Получаем доступ к камере
-video = cv2.VideoCapture(0)
+# Подключаемся к IP-камере
+ip_camera_url = "rtsp://admin:admin123456@192.168.1.17:8554/profile0"  # замените на URL Вашей камеры
+video = cv2.VideoCapture(ip_camera_url)
 
-# Подключение к SFTP-серверу
 sftp_host = '192.168.2.74'
 sftp_path = '/home/danya/dataSet/'
 sftp_username = 'danya'
@@ -29,7 +33,6 @@ cnopts = pysftp.CnOpts()
 cnopts.hostkeys = None  # Отключение проверки host key
 
 with pysftp.Connection(sftp_host, username=sftp_username, password=sftp_password, cnopts=cnopts) as sftp:
-    # Ваш код для работы с SFTP
     print("Соединено с SFTP-сервером")
 
     # Запускаем цикл
@@ -39,6 +42,7 @@ with pysftp.Connection(sftp_host, username=sftp_username, password=sftp_password
 
         # Проверяем, что изображение не пустое
         if not ret or im is None:
+            logging.warning("Не удалось получить кадр с камеры.")
             continue
 
         # Переводим всё в ч/б для простоты
@@ -52,13 +56,20 @@ with pysftp.Connection(sftp_host, username=sftp_username, password=sftp_password
             i += 1
             # Формируем имя файла
             filename = f"face-{name}.{i}.jpg"
-            local_path = os.path.join(path, "dataSet", filename)
 
-            # Сохраняем локально
-            cv2.imwrite(local_path, gray[y-offset:y+h+offset, x-offset:x+w+offset])
+            # Берем область с лицом и добавляем отступы
+            face_img = gray[y-offset:y+h+offset, x-offset:x+w+offset]
+
+            # Преобразуем изображение в формат, который можно отправить на SFTP
+            _, buffer = cv2.imencode('.jpg', face_img)
+
+            # Создаем временный файл для загрузки
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
+                temp_file.write(buffer)
+                temp_file_path = temp_file.name
 
             # Загружаем файл на сервер
-            sftp.put(local_path, sftp_path + filename)
+            sftp.put(temp_file_path, sftp_path + filename)
             print(f"Загружено {filename} на сервер")
 
             # Формируем размеры окна для вывода лица
@@ -69,7 +80,7 @@ with pysftp.Connection(sftp_host, username=sftp_username, password=sftp_password
             cv2.waitKey(100)
 
         # Если у нас достаточно кадров
-        if i > 100:
+        if i > 300:
             # Освобождаем камеру
             video.release()
             # Удаляем все созданные окна

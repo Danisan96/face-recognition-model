@@ -11,7 +11,6 @@ password = "admin"
 remote_path = "/home/danya/trainer/trainer.yml"
 local_path = "trainer.yml"
 
-# Функция для загрузки trainer.yml с SFTP
 def download_trainer_file():
     try:
         # Создаем SSH-клиент
@@ -31,6 +30,10 @@ def download_trainer_file():
 
 # Загружаем trainer.yml
 download_trainer_file()
+if os.path.exists(local_path):
+    print("Файл существует, продолжаем загрузку...")
+else:
+    print("Файл не найден, проверьте путь.")
 
 # создаём новый распознаватель лиц
 recognizer = cv2.face.LBPHFaceRecognizer_create()
@@ -38,8 +41,10 @@ recognizer = cv2.face.LBPHFaceRecognizer_create()
 recognizer.read(local_path)
 # указываем, что мы будем искать лица по примитивам Хаара
 faceCascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-# получаем доступ к камере
-cam = cv2.VideoCapture(0)
+
+ip_camera_url = "rtsp://admin:admin123456@192.168.1.17:8554/profile0"
+cam = cv2.VideoCapture(ip_camera_url)
+
 # настраиваем шрифт для вывода подписей
 font = cv2.FONT_HERSHEY_SIMPLEX
 
@@ -47,6 +52,11 @@ font = cv2.FONT_HERSHEY_SIMPLEX
 while True:
     # получаем видеопоток
     ret, im = cam.read()
+    
+    if not ret:
+        print("Не удалось получить изображение с камеры.")
+        break
+
     # переводим его в ч/б
     gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
     # определяем лица на видео
@@ -58,22 +68,30 @@ while True:
         # рисуем прямоугольник вокруг лица
         cv2.rectangle(im, (x-50, y-50), (x+w+50, y+h+50), (225, 0, 0), 2)
 
-        # если мы знаем id пользователя
-        if nbr_predicted == 7:
+        if nbr_predicted == 1:
+            nbr_predicted = 'Artem Adrianov'
+        elif nbr_predicted == 7:
             nbr_predicted = 'Danya Golubenko'
-        if nbr_predicted == 7:
-            nbr_predicted = 'Vova'
-        
-        # добавляем текст к рамке
+        elif nbr_predicted == 9:
+            nbr_predicted = 'Dima Dorogov'
+        elif nbr_predicted == 10:
+            nbr_predicted = 'Vova Dorashenko'
+        elif nbr_predicted == 11:
+            nbr_predicted = 'Tonya Ivanickaya'
+        elif nbr_predicted == 12:
+            nbr_predicted = 'Denis Kuzlev'
+        elif nbr_predicted == 17:
+            nbr_predicted = 'Nikita Pashkov'
+        elif nbr_predicted == 21:
+            nbr_predicted = 'Nikita Telniy'
+        else:
+            nbr_predicted = 'Unknown'
+
         cv2.putText(im, str(nbr_predicted), (x, y+h), font, 1.1, (0, 255, 0))
     
-    # выводим окно с изображением с камеры
     cv2.imshow('Face recognition', im)
-
-    # выход при нажатии клавиши 'q'
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    if cv2.waitKey(1) & 0xFF == ord('e'):
         break
-
-# освобождаем ресурсы
+    
 cam.release()
 cv2.destroyAllWindows()

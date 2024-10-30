@@ -3,6 +3,7 @@ import cv2
 import os
 import numpy as np
 from PIL import Image
+import io
 
 # Создаем объект SSHClient
 ssh = paramiko.SSHClient()
@@ -16,56 +17,52 @@ sftp = ssh.open_sftp()
 
 # Получаем список файлов из удаленной папки
 remote_dir = '/home/danya/dataSet/'
-local_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dataSet')
 
-# Обеспечим, что локальная папка существует
-os.makedirs(local_dir, exist_ok=True)
+# Создаем распознаватель лиц
+recognizer = cv2.face.LBPHFaceRecognizer_create()
+faceCascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 
-# Копируем файлы с сервера на локальную машину
-for filename in sftp.listdir(remote_dir):
-    local_file_path = os.path.join(local_dir, filename)
-    remote_file_path = remote_dir + filename
-    sftp.get(remote_file_path, local_file_path)
+# Получаем изображения и подписи из датасета
+def get_images_and_labels():
+    images = []
+    labels = []    
+    # Получаем список файлов из удаленной папки
+    for filename in sftp.listdir(remote_dir):
+        remote_file_path = remote_dir + filename
+        # Загружаем изображение в память
+        with sftp.open(remote_file_path) as file:
+            img_data = np.frombuffer(file.read(), np.uint8)
+            image = cv2.imdecode(img_data, cv2.IMREAD_GRAYSCALE)
+
+            if image is not None:
+                nbr = int(os.path.split(filename)[1].split(".")[0].replace("face-", ""))
+                faces = faceCascade.detectMultiScale(image)
+
+                for (x, y, w, h) in faces:
+                    images.append(image[y:y+h, x:x+w])
+                    labels.append(nbr)
+                    cv2.imshow("Adding faces to training set...", image[y:y+h, x:x+w])
+                    cv2.waitKey(100)
+
+    return images, labels
+
+# Предполагаем, что фотографии уже загружены на сервер и получаем список картинок и подписей
+images, labels = get_images_and_labels()
+
+# Обучаем модель
+recognizer.train(images, np.array(labels))
+
+# Сохраняем модель локально (можете убрать, если не нужно сохранять локально)
+local_trainer_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'trainer/trainer.yml')
+recognizer.save(local_trainer_path)
+
+# Теперь загружаем модель на сервер
+remote_trainer_path = '/home/danya/trainer/trainer.yml'
+sftp.put(local_trainer_path, remote_trainer_path)
 
 # Закрываем SFTP-соединение и SSH
 sftp.close()
 ssh.close()
 
-# Теперь продолжаем Ваш код для распознавания лиц...
-# Создаем новый распознаватель лиц
-recognizer = cv2.face.LBPHFaceRecognizer_create()
-faceCascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-
-# получаем картинки и подписи из датасета
-def get_images_and_labels(datapath):
-    image_paths = [os.path.join(datapath, f) for f in os.listdir(datapath)]
-    images = []
-    labels = []
-    
-    for image_path in image_paths:
-        image_pil = Image.open(image_path).convert('L')
-        image = np.array(image_pil, 'uint8')
-        nbr = int(os.path.split(image_path)[1].split(".")[0].replace("face-", ""))
-        faces = faceCascade.detectMultiScale(image)
-        
-        for (x, y, w, h) in faces:
-            images.append(image[y:y + h, x:x + w])
-            labels.append(nbr)
-            cv2.imshow("Adding faces to training set...", image[y:y + h, x:x + w])
-            cv2.waitKey(100)
-
-    return images, labels
-
-# получаем список картинок и подписей
-dataPath = local_dir  # Используем локальный путь
-images, labels = get_images_and_labels(dataPath)
-
-# обучаем модель
-recognizer.train(images, np.array(labels))
-
-# сохраняем модель
-trainer_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'trainer/trainer.yml')
-recognizer.save(trainer_path)
-
-# очищаем окна
+# Очищаем окна
 cv2.destroyAllWindows()
